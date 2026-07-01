@@ -45,20 +45,18 @@ export async function composeFrame(
   canvas.width = frame.width;
   canvas.height = frame.height;
   const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, frame.width, frame.height);
 
-  // 1) Draw each photo into its slot
+  // 1) Draw frame background first (JPG opaque, contains decorations + placeholder photos)
+  const overlay = await loadImage(frame.overlay);
+  ctx.drawImage(overlay, 0, 0, frame.width, frame.height);
+
+  // 2) Draw user photos ON TOP of each slot (covering the placeholder photos in the frame)
   const photos = await Promise.all(photoDataUrls.map((p) => loadImage(p)));
   for (let i = 0; i < frame.slots.length; i++) {
     const slot = frame.slots[i];
     const img = photos[i % photos.length];
     drawCover(ctx, img, slot.x, slot.y, slot.w, slot.h);
   }
-
-  // 2) Overlay frame image on top
-  const overlay = await loadImage(frame.overlay);
-  ctx.drawImage(overlay, 0, 0, frame.width, frame.height);
 
   return canvas.toDataURL("image/jpeg", 0.92);
 }
