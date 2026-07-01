@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ThemeProvider } from "@/lib/theme";
+import { PageTransition } from "@/components/page-transition";
 
 function NotFoundComponent() {
   return (
@@ -128,7 +129,9 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <Outlet />
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </ThemeProvider>
     </QueryClientProvider>
   );

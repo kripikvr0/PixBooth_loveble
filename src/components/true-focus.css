@@ -16,10 +16,15 @@
   transition: filter 0.3s ease, color 0.3s ease;
   outline: none;
   user-select: none;
-  background: linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(var(--primary)) 60%, hsl(var(--accent)) 100%);
+  color: var(--foreground);
+  background: linear-gradient(135deg, var(--foreground) 0%, var(--primary) 55%, var(--accent-glow) 100%);
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.focus-word.active {
+  filter: drop-shadow(0 0 24px var(--glow-color, oklch(0.78 0.2 330 / 0.6)));
 }
 
 .focus-word.active {
