@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FRAMES } from "@/lib/frames";
-import { SpotlightTitle } from "@/components/spotlight-title";
+import TrueFocus from "@/components/true-focus";
 import { GlassButton, GlassCard } from "@/components/glass";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BottomNav } from "@/components/bottom-nav";
@@ -48,14 +48,16 @@ function HomePage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-4 pt-10 text-center sm:pt-16">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-xs text-foreground/80">
-          <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-          Liquid Glass · v2
+        <div className="font-display text-6xl sm:text-7xl md:text-8xl leading-[0.95]">
+          <TrueFocus
+            sentence="Pix Booth"
+            blurAmount={5}
+            borderColor="oklch(0.78 0.2 330)"
+            glowColor="oklch(0.78 0.2 330 / 0.7)"
+            animationDuration={0.5}
+            pauseBetweenAnimations={0.8}
+          />
         </div>
-
-        <h1 className="font-display text-6xl sm:text-7xl md:text-8xl leading-[0.95]">
-          <SpotlightTitle text="PixBooth" />
-        </h1>
 
         <p className="mx-auto mt-5 max-w-md text-sm text-foreground/70 sm:text-base">
           Photobooth estetik dengan frame Instagramable. Jepret, susun, share — semua di browser HP kamu.
