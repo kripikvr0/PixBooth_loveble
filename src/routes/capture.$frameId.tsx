@@ -7,7 +7,16 @@ export const Route = createFileRoute("/capture/$frameId")({
   component: CapturePage,
 });
 
+function useDebugFlag() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    setOn(new URLSearchParams(window.location.search).get("debug") === "1");
+  }, []);
+  return on;
+}
+
 function CapturePage() {
+  const debug = useDebugFlag();
   const { frameId } = Route.useParams();
   const navigate = useNavigate();
   const frame = getFrame(frameId);
@@ -126,6 +135,36 @@ function CapturePage() {
           )}
           {countdown === 0 && (
             <div className="pointer-events-none absolute inset-0 animate-[flash_400ms_ease-out] bg-white" />
+          )}
+          {debug && (
+            <div
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              style={{
+                aspectRatio: `${frame.width} / ${frame.height}`,
+                height: "100%",
+              }}
+            >
+              <img src={frame.overlay} alt="" className="absolute inset-0 h-full w-full object-contain opacity-40" />
+              <svg viewBox={`0 0 ${frame.width} ${frame.height}`} className="absolute inset-0 h-full w-full">
+                {frame.slots.map((s, i) => (
+                  <g key={i}>
+                    <rect
+                      x={s.x}
+                      y={s.y}
+                      width={s.w}
+                      height={s.h}
+                      fill={i === shotIndex ? "rgba(255,59,154,0.25)" : "rgba(0,212,255,0.1)"}
+                      stroke={i === shotIndex ? "#ff3b9a" : "#00d4ff"}
+                      strokeWidth={i === shotIndex ? 5 : 3}
+                      strokeDasharray={i === shotIndex ? "none" : "10 8"}
+                    />
+                    <text x={s.x + 8} y={s.y + 28} fill="#fff" fontSize={22} fontWeight="bold" fontFamily="monospace">
+                      #{i}
+                    </text>
+                  </g>
+                ))}
+              </svg>
+            </div>
           )}
         </div>
       </main>
