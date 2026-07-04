@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResultRouteImport } from './routes/result'
 import { Route as GalleryRouteImport } from './routes/gallery'
+import { Route as DebugRouteImport } from './routes/debug'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CaptureFrameIdRouteImport } from './routes/capture.$frameId'
 
@@ -22,6 +23,11 @@ const ResultRoute = ResultRouteImport.update({
 const GalleryRoute = GalleryRouteImport.update({
   id: '/gallery',
   path: '/gallery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DebugRoute = DebugRouteImport.update({
+  id: '/debug',
+  path: '/debug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -37,12 +43,14 @@ const CaptureFrameIdRoute = CaptureFrameIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/debug': typeof DebugRoute
   '/gallery': typeof GalleryRoute
   '/result': typeof ResultRoute
   '/capture/$frameId': typeof CaptureFrameIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/debug': typeof DebugRoute
   '/gallery': typeof GalleryRoute
   '/result': typeof ResultRoute
   '/capture/$frameId': typeof CaptureFrameIdRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/debug': typeof DebugRoute
   '/gallery': typeof GalleryRoute
   '/result': typeof ResultRoute
   '/capture/$frameId': typeof CaptureFrameIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/gallery' | '/result' | '/capture/$frameId'
+  fullPaths: '/' | '/debug' | '/gallery' | '/result' | '/capture/$frameId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/gallery' | '/result' | '/capture/$frameId'
-  id: '__root__' | '/' | '/gallery' | '/result' | '/capture/$frameId'
+  to: '/' | '/debug' | '/gallery' | '/result' | '/capture/$frameId'
+  id: '__root__' | '/' | '/debug' | '/gallery' | '/result' | '/capture/$frameId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DebugRoute: typeof DebugRoute
   GalleryRoute: typeof GalleryRoute
   ResultRoute: typeof ResultRoute
   CaptureFrameIdRoute: typeof CaptureFrameIdRoute
@@ -85,6 +95,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GalleryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/debug': {
+      id: '/debug'
+      path: '/debug'
+      fullPath: '/debug'
+      preLoaderRoute: typeof DebugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DebugRoute: DebugRoute,
   GalleryRoute: GalleryRoute,
   ResultRoute: ResultRoute,
   CaptureFrameIdRoute: CaptureFrameIdRoute,
