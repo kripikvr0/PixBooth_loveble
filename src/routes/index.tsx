@@ -88,7 +88,8 @@ function HomePage() {
                 className="absolute left-1/2 top-0 -translate-x-1/2 animate-float-slow"
                 style={{
                   transform: `translateX(calc(-50% + ${offset * 56}px)) rotate(${rotate}deg)`,
-                  ["--r" as never]: `${rotate}deg`,
+                  // @ts-expect-error CSS custom property
+                  "--r": `${rotate}deg`,
                   zIndex: 10 - Math.abs(offset),
                   animationDelay: `${i * 0.3}s`,
                 }}
