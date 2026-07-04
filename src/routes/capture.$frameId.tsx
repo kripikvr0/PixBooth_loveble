@@ -7,7 +7,13 @@ export const Route = createFileRoute("/capture/$frameId")({
   component: CapturePage,
 });
 
-function CapturePage() {
+function useDebugFlag() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    setOn(new URLSearchParams(window.location.search).get("debug") === "1");
+  }, []);
+  return on;
+}
   const { frameId } = Route.useParams();
   const navigate = useNavigate();
   const frame = getFrame(frameId);
