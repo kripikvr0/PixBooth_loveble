@@ -1,38 +1,58 @@
-## PixBooth — Photobooth dengan 10 Frame Kamu (1:1)
+## Debug Mode: Visualisasi Slot Frame
 
-Pakai 10 gambar yang kamu upload **persis seperti aslinya** sebagai frame overlay. Foto user diisi ke kotak kosong (hitam/putih) di tiap frame, semua collage/stiker/teks di sekitarnya tetap utuh.
+Tambah mode debug supaya bisa lihat posisi & ukuran tiap slot foto di atas overlay frame, jadi gampang ngecek frame mana yang masih meleset dan berapa banyak.
 
-### 10 Frame
-1. Baby Girl (gingham merah + receipt) — 3 foto
-2. The 1975 "About You" (koran b&w) — 3 foto
-3. Polaroid Film Strip (denim) — 4 foto
-4. Leopard Sepia — 3 foto
-5. Kate & Jackson Airmail — 3 foto
-6. Sasana Inbox (dual strip) — 8 foto (4+4)
-7. Allday Project Receipt — 1 foto portrait
-8. Airmail Blank — 3 foto
-9. Leopard Brown + Lily — 3 foto
-10. Personalab Breaking News — 4 foto
+### Yang dibangun
 
-### Cara kerja
-- Tiap frame disimpan sebagai gambar overlay (PNG/JPG asli kamu) + koordinat slot foto (x, y, w, h per kotak kosong, diukur manual dari tiap gambar).
-- User pilih frame → kamera depan (mirror) → countdown 3-2-1 → ambil N foto otomatis (sesuai jumlah slot) dengan jeda 3 detik.
-- Canvas compositing: gambar foto user di tiap slot, lalu timpa overlay frame di atasnya → export JPEG portrait beresolusi sama dengan frame asli (~736×1308 mengikuti aspect ratio upload).
-- Hasil bisa di-download / share / disimpan ke gallery (IndexedDB).
+**1. Halaman baru `/debug` (route `src/routes/debug.tsx`)**
+- Grid 10 frame (mirip home) → klik salah satu → masuk ke debug view.
+- Debug view per frame menampilkan:
+  - Overlay frame di-render pada ukuran asli (di-scale responsive, tapi koordinat dihitung di ruang asli 736×1308 dll).
+  - Setiap slot digambar sebagai kotak overlay semi-transparan (warna beda per slot) dengan border tegas.
+  - Label di tiap slot: `#index  x,y  w×h`.
+  - Ruler / grid opsional (garis tiap 50px) untuk bantu perkiraan koordinat.
 
-### Halaman
-- `/` — grid 10 thumbnail frame
-- `/capture/$frameId` — kamera + countdown
-- `/result` — preview hasil + tombol Save / Share / Retake
-- `/gallery` — daftar foto tersimpan
+**2. Panel kontrol di sisi kanan / bawah**
+- Toggle: Show slots / Show grid / Show labels / Show ruler.
+- Pilih slot aktif → nudge dengan tombol ◀ ▲ ▼ ▶ (step 1px / 5px / 10px) untuk `x`, `y`, `w`, `h`.
+- Nilai slot ditampilkan live sebagai JSON siap-copy:
+  ```ts
+  { x: 170, y: 469, w: 292, h: 286 }
+  ```
+- Tombol **Copy JSON** untuk seluruh array `slots` frame aktif → tinggal paste ke `src/lib/frames.ts`.
+- Tombol **Reset** kembali ke nilai default dari `FRAMES`.
+- Nilai tweak disimpan ke `localStorage` per `frameId` biar ga hilang saat refresh.
 
-### Stack
-- TanStack Start (sudah ada), Canvas 2D, getUserMedia, IndexedDB (`idb`), Web Share API.
-- Frame images masuk ke `src/assets/frames/` via Lovable Assets dari upload kamu.
-- Bahasa UI: Indonesia (default) + English toggle.
+**3. Preview kompositing test**
+- Tombol "Test with sample photo" → isi tiap slot dengan gambar placeholder (kotak berwarna + nomor) via `composeFrame`, tampilkan hasilnya di sebelah view slot.
+- Biar keliatan langsung apakah slot sudah pas nutupin placeholder di frame JPG.
+
+**4. Debug overlay di halaman `/capture/$frameId`**
+- Query param `?debug=1` → saat kamera aktif, tampilkan outline slot (posisi + label) di atas preview video (di-scale ke ukuran video), plus counter slot yang sedang aktif dibold.
+- Kalau `?debug=1` tidak ada, capture jalan normal (zero cost di production).
+
+**5. Entry point**
+- Tombol kecil "Debug" di footer home (atau di bottom-nav dev-only) yang ngarah ke `/debug`.
+- Bisa juga diakses langsung dari URL.
+
+### File yang disentuh
+
+- `src/routes/debug.tsx` — halaman debug + panel kontrol (baru).
+- `src/components/slot-inspector.tsx` — komponen render overlay slot + ruler + labels (baru).
+- `src/lib/frames.ts` — export helper `getDefaultSlots(frameId)` untuk reset.
+- `src/routes/capture.$frameId.tsx` — tambah overlay `?debug=1`.
+- `src/routes/index.tsx` — link kecil ke `/debug`.
+- `src/routeTree.gen.ts` — auto-generated route baru.
+
+### Alur pakai
+
+1. Buka `/debug` → pilih frame yang meleset.
+2. Toggle slots + labels, lihat mana yang keluar dari kotak kosong di overlay.
+3. Klik slot → nudge sampai pas.
+4. Klik **Copy JSON** → paste ke `FRAMES` di `src/lib/frames.ts`.
+5. Test dengan sample photo untuk konfirmasi.
 
 ### Catatan
-- v1: 10 frame fixed, belum ada filter/AR/upload frame custom.
-- Koordinat slot di-tune manual per frame supaya foto ngepas di kotak kosong.
 
-Approve kalau oke, atau bilang frame mana yang mau diprioritaskan dulu (kalau mau bertahap, bukan 10 sekaligus).
+- Debug mode tidak mengubah data foto user, tidak menyentuh IndexedDB gallery.
+- Semua kalkulasi tetap di ruang koordinat asli frame — scaling untuk display cuma di layer CSS transform, biar copy-paste ke `FRAMES` langsung akurat.
