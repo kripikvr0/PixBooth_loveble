@@ -14,6 +14,9 @@ function useDebugFlag() {
   }, []);
   return on;
 }
+
+function CapturePage() {
+  const debug = useDebugFlag();
   const { frameId } = Route.useParams();
   const navigate = useNavigate();
   const frame = getFrame(frameId);
