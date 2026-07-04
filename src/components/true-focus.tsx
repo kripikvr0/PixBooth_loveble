@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "motion/react";
 import "./true-focus.css";
 
@@ -29,9 +29,19 @@ export default function TrueFocus({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lastActiveIndex, setLastActiveIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const wordRefs = useRef<Map<number, HTMLSpanElement>>(new Map());
   const [focusRect, setFocusRect] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
+  // Stable callback ref that won't cause re-renders
+  const setWordRef = useCallback((index: number) => (el: HTMLSpanElement | null) => {
+    if (el) {
+      wordRefs.current.set(index, el);
+    } else {
+      wordRefs.current.delete(index);
+    }
+  }, []);
+
+  // Auto-rotate words
   useEffect(() => {
     if (manualMode) return;
     const interval = setInterval(
@@ -41,15 +51,30 @@ export default function TrueFocus({
     return () => clearInterval(interval);
   }, [manualMode, animationDuration, pauseBetweenAnimations, words.length]);
 
+  // Update focus frame position
   useEffect(() => {
     if (currentIndex < 0) return;
-    const el = wordRefs.current[currentIndex];
+    const el = wordRefs.current.get(currentIndex);
     const parent = containerRef.current;
     if (!el || !parent) return;
     const p = parent.getBoundingClientRect();
     const a = el.getBoundingClientRect();
     setFocusRect({ x: a.left - p.left, y: a.top - p.top, width: a.width, height: a.height });
   }, [currentIndex, words.length]);
+
+  // Handle manual mode hover
+  const handleMouseEnter = useCallback((index: number) => {
+    if (manualMode) {
+      setLastActiveIndex(index);
+      setCurrentIndex(index);
+    }
+  }, [manualMode]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (manualMode && lastActiveIndex !== null) {
+      setCurrentIndex(lastActiveIndex);
+    }
+  }, [manualMode, lastActiveIndex]);
 
   return (
     <div className={`focus-container ${className ?? ""}`} ref={containerRef}>
@@ -58,9 +83,7 @@ export default function TrueFocus({
         return (
           <span
             key={index}
-            ref={(el) => {
-              wordRefs.current[index] = el;
-            }}
+            ref={setWordRef(index)}
             className={`focus-word ${isActive ? "active" : ""}`}
             style={
               {
@@ -70,15 +93,8 @@ export default function TrueFocus({
                 transition: `filter ${animationDuration}s ease`,
               } as React.CSSProperties
             }
-            onMouseEnter={() => {
-              if (manualMode) {
-                setLastActiveIndex(index);
-                setCurrentIndex(index);
-              }
-            }}
-            onMouseLeave={() => {
-              if (manualMode && lastActiveIndex !== null) setCurrentIndex(lastActiveIndex);
-            }}
+            onMouseEnter={() => handleMouseEnter(index)}
+            onMouseLeave={handleMouseLeave}
           >
             {word}
           </span>

@@ -1,7 +1,36 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { getFrame } from "@/lib/frames";
 import { captureFromVideo, composeFrame } from "@/lib/compose";
+
+// ---- IndexedDB temp storage (replaces sessionStorage for large data) ----
+const TEMP_DB_NAME = "pixbooth-temp";
+const TEMP_STORE = "lastCapture";
+const TEMP_KEY = "latest";
+
+async function openTempDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(TEMP_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(TEMP_STORE)) {
+        db.createObjectStore(TEMP_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveTempCapture(data: { frameId: string; dataUrl: string }): Promise<void> {
+  const db = await openTempDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(TEMP_STORE, "readwrite");
+    tx.objectStore(TEMP_STORE).put(data, TEMP_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 
 export const Route = createFileRoute("/capture/$frameId")({
   component: CapturePage,
@@ -23,6 +52,7 @@ function CapturePage() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -30,6 +60,7 @@ function CapturePage() {
   const [running, setRunning] = useState(false);
   const [composing, setComposing] = useState(false);
 
+  // Camera initialization
   useEffect(() => {
     let cancelled = false;
     async function start() {
@@ -49,10 +80,12 @@ function CapturePage() {
           setReady(true);
         }
       } catch (e) {
-        setError(
-          (e as Error)?.message ||
-            "Tidak bisa akses kamera. Pastikan izin kamera diaktifkan.",
-        );
+        if (!cancelled) {
+          setError(
+            (e as Error)?.message ||
+              "Tidak bisa akses kamera. Pastikan izin kamera diaktifkan.",
+          );
+        }
       }
     }
     start();
@@ -62,36 +95,81 @@ function CapturePage() {
     };
   }, []);
 
+  const wait = useCallback((ms: number, signal?: AbortSignal) => {
+    return new Promise<void>((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new DOMException("Cancelled", "AbortError"));
+        return;
+      }
+      const timer = setTimeout(resolve, ms);
+      signal?.addEventListener("abort", () => {
+        clearTimeout(timer);
+        reject(new DOMException("Cancelled", "AbortError"));
+      });
+    });
+  }, []);
+
   async function runSession() {
     if (!frame || !videoRef.current || running) return;
+
+    // Create new abort controller for this session
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
+
     setRunning(true);
+    setError(null);
     const photos: string[] = [];
-    for (let i = 0; i < frame.slots.length; i++) {
-      setShotIndex(i);
-      // countdown 3..1
-      for (let c = 3; c > 0; c--) {
-        setCountdown(c);
-        await wait(1000);
+
+    try {
+      for (let i = 0; i < frame.slots.length; i++) {
+        if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
+        setShotIndex(i);
+
+        // Countdown 3..1
+        for (let c = 3; c > 0; c--) {
+          if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
+          setCountdown(c);
+          await wait(1000, signal);
+        }
+
+        if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
+        setCountdown(0);
+
+        // Capture photo
+        const video = videoRef.current;
+        if (!video) throw new DOMException("Video element lost", "AbortError");
+        photos.push(captureFromVideo(video));
+
+        await wait(400, signal);
+        setCountdown(null);
+        if (i < frame.slots.length - 1) await wait(700, signal);
       }
-      setCountdown(0);
-      // flash effect handled by CSS via countdown === 0
-      photos.push(captureFromVideo(videoRef.current!));
-      await wait(400);
-      setCountdown(null);
-      if (i < frame.slots.length - 1) await wait(700);
+
+      if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
+
+      setComposing(true);
+      const composed = await composeFrame(frame, photos);
+
+      await saveTempCapture({ frameId: frame.id, dataUrl: composed });
+      navigate({ to: "/result" });
+    } catch (e) {
+      if ((e as Error).name === "AbortError") {
+        // User cancelled - cleanup state
+        setCountdown(null);
+        setShotIndex(0);
+        setRunning(false);
+        setComposing(false);
+        return;
+      }
+      setError((e as Error)?.message || "Terjadi kesalahan saat mengambil foto.");
+      setRunning(false);
+      setComposing(false);
     }
-    setComposing(true);
-    const composed = await composeFrame(frame, photos);
-    // pass via sessionStorage
-    sessionStorage.setItem(
-      "pixbooth:last",
-      JSON.stringify({ frameId: frame.id, dataUrl: composed }),
-    );
-    navigate({ to: "/result" });
   }
 
-  function wait(ms: number) {
-    return new Promise((r) => setTimeout(r, ms));
+  function cancelSession() {
+    abortRef.current?.abort();
   }
 
   if (!frame) {
@@ -108,9 +186,18 @@ function CapturePage() {
   return (
     <div className="flex min-h-screen flex-col bg-black text-white">
       <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <Link to="/" className="rounded-full px-3 py-1 text-sm text-white/70 hover:bg-white/10">
-          ← Batal
-        </Link>
+        {running ? (
+          <button
+            onClick={cancelSession}
+            className="rounded-full px-3 py-1 text-sm text-red-400 hover:bg-red-500/20 transition"
+          >
+            ✕ Batal
+          </button>
+        ) : (
+          <Link to="/" className="rounded-full px-3 py-1 text-sm text-white/70 hover:bg-white/10">
+            ← Batal
+          </Link>
+        )}
         <div className="text-sm font-semibold">{frame.name}</div>
         <div className="w-16 text-right text-xs text-white/50">
           {shotIndex + (running ? 1 : 0)}/{frame.slots.length}
@@ -171,18 +258,35 @@ function CapturePage() {
 
       <footer className="border-t border-white/10 px-4 py-4">
         {error ? (
-          <p className="text-center text-sm text-red-400">{error}</p>
+          <div className="text-center">
+            <p className="text-sm text-red-400">{error}</p>
+            <button
+              onClick={() => { setError(null); setRunning(false); setComposing(false); }}
+              className="mt-2 text-sm text-white/60 underline hover:text-white"
+            >
+              Coba lagi
+            </button>
+          </div>
         ) : !ready ? (
           <p className="text-center text-sm text-white/60">Menyiapkan kamera…</p>
         ) : composing ? (
           <p className="text-center text-sm text-white/70">Merangkai foto…</p>
+        ) : running ? (
+          <div className="text-center">
+            <p className="text-sm text-white/70 mb-2">Foto ke {shotIndex + 1} dari {frame.slots.length}…</p>
+            <button
+              onClick={cancelSession}
+              className="text-xs text-red-400 hover:text-red-300 underline"
+            >
+              Batalkan sesi
+            </button>
+          </div>
         ) : (
           <button
             onClick={runSession}
-            disabled={running}
-            className="mx-auto block w-full max-w-xs rounded-full bg-pink-500 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-pink-500/30 transition active:scale-95 disabled:opacity-50"
+            className="mx-auto block w-full max-w-xs rounded-full bg-pink-500 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-pink-500/30 transition active:scale-95"
           >
-            {running ? `Foto ke ${shotIndex + 1}…` : `Mulai (${frame.slots.length} foto)`}
+            Mulai ({frame.slots.length} foto)
           </button>
         )}
       </footer>
